@@ -1,1 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Functional Color Harmonizer</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9ca3af;--glass:rgba(255,255,255,0.03)}
+    html,body{height:100%;margin:0;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial}
+    body{background:linear-gradient(180deg,#071021 0%, #071827 100%);color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:28px}
+    .card{width:100%;max-width:980px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:14px;padding:24px;box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+    h1{margin:0 0 6px;font-size:20px}
+    p.lead{margin:0 0 20px;color:var(--muted)}
+
+    .controls{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+    .input-wrap{display:flex;align-items:center;gap:8px}
+    input[type="text"]{padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;font-size:14px;width:150px}
+    input[type="color"]{width:44px;height:44px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);padding:0;background:transparent}
+    button{padding:10px 12px;border-radius:8px;border:0;background:#0ea5a9;color:#042;cursor:pointer;font-weight:600}
+    button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+
+    .swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+    .swatch{height:120px;border-radius:8px;display:flex;flex-direction:column;justify-content:flex-end;padding:10px;color:rgba(0,0,0,0.75);font-weight:700}
+    .swatch .label{font-size:13px;margin:0}
+    .swatch .sub{font-size:12px;margin-top:6px;color:rgba(0,0,0,0.6);font-weight:600}
+    .swatch.darkText{color:#0b1220}
+
+    .info{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .pill{background:var(--glass);padding:8px 10px;border-radius:8px;font-size:13px;color:var(--muted)}
+    .footer{margin-top:18px;color:var(--muted);font-size:13px}
+
+    @media (max-width:720px){.swatches{grid-template-columns:repeat(2,1fr)} }
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <h1>Functional Color Harmonizer</h1>
+    <p class="lead">Type a HEX value or pick a color. This single-page tool uses pure functions (no classes) to compute complementary and triadic harmonies and updates the UI reactively.</p>
+
+    <div class="controls" aria-live="polite">
+      <div class="input-wrap">
+        <label for="hexInput" style="font-size:13px;color:var(--muted);">HEX</label>
+        <input id="hexInput" type="text" inputmode="text" maxlength="7" placeholder="#1F8FFF" aria-label="Hex color input">
+      </div>
+
+      <div class="input-wrap">
+        <label for="colorPicker" style="font-size:13px;color:var(--muted);">Picker</label>
+        <input id="colorPicker" type="color" value="#1f8fff" aria-label="Color picker">
+      </div>
+
+      <div class="input-wrap">
+        <button id="applyBtn" title="Apply color">Apply</button>
+        <button id="randomBtn" class="secondary" title="Random color">Random</button>
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <button id="copyBase" class="secondary" title="Copy base HEX">Copy HEX</button>
+        <button id="copyAll" class="secondary" title="Copy all colors">Copy all</button>
+      </div>
+    </div>
+
+    <div class="swatches" role="list">
+      <div id="baseSwatch" class="swatch darkText" role="listitem">
+        <div class="label" id="baseHex">#1F8FFF</div>
+        <div class="sub" id="baseHsl">hsl(207, 96%, 58%)</div>
+      </div>
+
+      <div id="complementarySwatch" class="swatch darkText" role="listitem">
+        <div class="label" id="compHex">#FFB51F</div>
+        <div class="sub" id="compHsl">hsl(27, 98%, 55%)</div>
+      </div>
+
+      <div id="triadic1Swatch" class="swatch darkText" role="listitem">
+        <div class="label" id="tri1Hex">#8FFF1F</div>
+        <div class="sub" id="tri1Hsl">hsl(97, 96%, 58%)</div>
+      </div>
+
+      <div id="triadic2Swatch" class="swatch darkText" role="listitem">
+        <div class="label" id="tri2Hex">#FF1F8F</div>
+        <div class="sub" id="tri2Hsl">hsl(327, 96%, 58%)</div>
+      </div>
+    </div>
+
+    <div class="info">
+      <div class="pill" id="warning" style="display:none;color:#fca5a5;background:rgba(255,165,165,0.06)">Invalid HEX — please use #RRGGBB</div>
+      <div class="pill">Pure functions: <strong>hexToHsl</strong>, <strong>calculateHarmonies</strong>, <strong>hslToCss</strong></div>
+      <div class="pill">Only <strong>updateColors</strong> touches the DOM.</div>
+    </div>
+
+    <p class="footer">Download or copy the code and open as an HTML file in your browser.</p>
+  </main>
+
+  <script>
+    /* ----------------- Pure helper functions (no classes/prototypes) ----------------- */
+
+    // Clean hex: allow #RRGGBB or RRGGBB; return uppercase with leading '#'
+    const normalizeHex = hex => {
+      if (typeof hex !== 'string') return null;
+      const h = hex.trim();
+      const withHash = h.startsWith('#') ? h.slice(1) : h;
+      if (!/^([0-9a-fA-F]{6})$/.test(withHash)) return null;
+      return '#' + withHash.toUpperCase();
+    };
+
+    // hexToHsl: pure function. Input: '#RRGGBB' -> Output: [H, S, L]
+    const hexToHsl = hex => {
+      const n = normalizeHex(hex);
+      if (!n) return null;
+      const r = parseInt(n.slice(1,3),16) / 255;
+      const g = parseInt(n.slice(3,5),16) / 255;
+      const b = parseInt(n.slice(5,7),16) / 255;
+
+      const max = Math.max(r,g,b), min = Math.min(r,g,b);
+      let h = 0, s = 0;
+      const l = (max + min) / 2;
+
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = ((g - b) / d) + (g < b ? 6 : 0); break;
+          case g: h = ((b - r) / d) + 2; break;
+          case b: h = ((r - g) / d) + 4; break;
+        }
+        h = h * 60; // convert to degrees
+      }
+
+      return [Math.round(h === 0 ? 0 : (h % 360 + 360) % 360), Math.round(s * 100), Math.round(l * 100)];
+    };
+
+    // rotateHue: pure helper. Keeps S & L the same.
+    const rotateHue = (hsl, degrees) => {
+      const [h,s,l] = hsl;
+      const newH = ((h + degrees) % 360 + 360) % 360; // normalize
+      return [Math.round(newH), s, l];
+    };
+
+    // calculateHarmonies: pure function. Input: [H,S,L] -> returns object with complementary & triads
+    const calculateHarmonies = baseHsl => {
+      if (!Array.isArray(baseHsl) || baseHsl.length !== 3) return null;
+      const complementary = rotateHue(baseHsl, 180);
+      const triadic1 = rotateHue(baseHsl, 120);
+      const triadic2 = rotateHue(baseHsl, 240);
+      return { complementary, triadic1, triadic2 };
+    };
+
+    // hslToCss: pure function. Input: [H,S,L] -> 'hsl(H, S%, L%)'
+    const hslToCss = hsl => {
+      if (!Array.isArray(hsl) || hsl.length !== 3) return '';
+      const [h,s,l] = hsl;
+      return `hsl(${h}, ${s}%, ${l}%)`;
+    };
+
+    // hslToHex: convert HSL back to HEX for display and copying. Pure function.
+    const hslToRgb = hsl => {
+      const [h, s, l] = hsl.map((v,i) => i === 0 ? v : v/100);
+      const c = (1 - Math.abs(2*l - 1)) * s;
+      const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+      const m = l - c/2;
+      let r1=0,g1=0,b1=0;
+      if (0 <= h && h < 60) { r1=c; g1=x; b1=0; }
+      else if (60 <= h && h < 120) { r1=x; g1=c; b1=0; }
+      else if (120 <= h && h < 180) { r1=0; g1=c; b1=x; }
+      else if (180 <= h && h < 240) { r1=0; g1=x; b1=c; }
+      else if (240 <= h && h < 300) { r1=x; g1=0; b1=c; }
+      else { r1=c; g1=0; b1=x; }
+      const r = Math.round((r1 + m) * 255);
+      const g = Math.round((g1 + m) * 255);
+      const b = Math.round((b1 + m) * 255);
+      return [r,g,b];
+    };
+
+    const rgbToHex = (r,g,b) => '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase();
+
+    const hslToHex = hsl => rgbToHex(...hslToRgb(hsl));
+
+    /* ----------------- UI (only updateColors touches the DOM) ----------------- */
+    const els = {
+      hexInput: document.getElementById('hexInput'),
+      colorPicker: document.getElementById('colorPicker'),
+      applyBtn: document.getElementById('applyBtn'),
+      randomBtn: document.getElementById('randomBtn'),
+      copyBase: document.getElementById('copyBase'),
+      copyAll: document.getElementById('copyAll'),
+      baseSwatch: document.getElementById('baseSwatch'),
+      complementarySwatch: document.getElementById('complementarySwatch'),
+      triadic1Swatch: document.getElementById('triadic1Swatch'),
+      triadic2Swatch: document.getElementById('triadic2Swatch'),
+      baseHex: document.getElementById('baseHex'),
+      baseHsl: document.getElementById('baseHsl'),
+      compHex: document.getElementById('compHex'),
+      compHsl: document.getElementById('compHsl'),
+      tri1Hex: document.getElementById('tri1Hex'),
+      tri1Hsl: document.getElementById('tri1Hsl'),
+      tri2Hex: document.getElementById('tri2Hex'),
+      tri2Hsl: document.getElementById('tri2Hsl'),
+      warning: document.getElementById('warning')
+    };
+
+    // Guarded updateColors: reads input, computes, and updates DOM
+    const updateColors = () => {
+      const raw = els.hexInput.value || els.colorPicker.value || '';
+      const normalized = normalizeHex(raw) || normalizeHex(els.colorPicker.value) || null;
+      if (!normalized) {
+        els.warning.style.display = 'inline-block';
+        return;
+      }
+      els.warning.style.display = 'none';
+
+      // Pure conversion chain
+      const baseHsl = hexToHsl(normalized); // pure
+      const harmonies = calculateHarmonies(baseHsl); // pure
+
+      // Format for DOM
+      const baseCss = hslToCss(baseHsl);
+      const compCss = hslToCss(harmonies.complementary);
+      const tri1Css = hslToCss(harmonies.triadic1);
+      const tri2Css = hslToCss(harmonies.triadic2);
+
+      const baseHex = normalized.toUpperCase();
+      const compHex = hslToHex(harmonies.complementary);
+      const tri1Hex = hslToHex(harmonies.triadic1);
+      const tri2Hex = hslToHex(harmonies.triadic2);
+
+      // Update swatches
+      els.baseSwatch.style.backgroundColor = baseCss; els.baseHex.textContent = baseHex; els.baseHsl.textContent = baseCss;
+      els.complementarySwatch.style.backgroundColor = compCss; els.compHex.textContent = compHex; els.compHsl.textContent = compCss;
+      els.triadic1Swatch.style.backgroundColor = tri1Css; els.tri1Hex.textContent = tri1Hex; els.tri1Hsl.textContent = tri1Css;
+      els.triadic2Swatch.style.backgroundColor = tri2Css; els.tri2Hex.textContent = tri2Hex; els.tri2Hsl.textContent = tri2Css;
+
+      // adjust text color for readability
+      [els.baseSwatch, els.complementarySwatch, els.triadic1Swatch, els.triadic2Swatch].forEach(swatch => {
+        // compute luminance from background color
+        const bg = getComputedStyle(swatch).backgroundColor; // e.g. 'rgb(31,143,255)'
+        const nums = bg.match(/\d+/g) || [0,0,0];
+        const [r,g,b] = nums.map(n => parseInt(n,10)/255);
+        const luminance = 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
+        swatch.classList.toggle('darkText', luminance > 0.6);
+      });
+
+      // sync color picker & hex input
+      els.colorPicker.value = baseHex;
+      els.hexInput.value = baseHex;
+    };
+
+    // helper for luminance
+    const linearize = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+
+    /* ----------------- Utility actions ----------------- */
+    const applyFromPicker = () => {
+      const pick = els.colorPicker.value;
+      els.hexInput.value = pick.toUpperCase();
+      updateColors();
+    };
+
+    const applyFromInput = () => {
+      const val = els.hexInput.value;
+      const n = normalizeHex(val);
+      if (n) {
+        els.colorPicker.value = n;
+        els.hexInput.value = n;
+        updateColors();
+      } else {
+        els.warning.style.display = 'inline-block';
+      }
+    };
+
+    const randomHex = () => {
+      const r = Math.floor(Math.random()*256);
+      const g = Math.floor(Math.random()*256);
+      const b = Math.floor(Math.random()*256);
+      const hex = rgbToHex(r,g,b);
+      els.hexInput.value = hex; els.colorPicker.value = hex; updateColors();
+    };
+
+    const copyText = async text => {
+      try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
+    };
+
+    const copyBaseHex = async () => {
+      const ok = await copyText(els.baseHex.textContent);
+      if (ok) els.copyBase.textContent = 'Copied!';
+      setTimeout(()=> els.copyBase.textContent = 'Copy HEX', 1200);
+    };
+
+    const copyAll = async () => {
+      const all = [els.baseHex.textContent, els.compHex.textContent, els.tri1Hex.textContent, els.tri2Hex.textContent].join(', ');
+      const ok = await copyText(all);
+      if (ok) els.copyAll.textContent = 'Copied!';
+      setTimeout(()=> els.copyAll.textContent = 'Copy all', 1200);
+    };
+
+    /* ----------------- Event wiring ----------------- */
+    els.applyBtn.addEventListener('click', applyFromInput);
+    els.colorPicker.addEventListener('input', applyFromPicker);
+    els.hexInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFromInput(); });
+    els.randomBtn.addEventListener('click', randomHex);
+    els.copyBase.addEventListener('click', copyBaseHex);
+    els.copyAll.addEventListener('click', copyAll);
+
+    // initialize
+    els.hexInput.value = '#1F8FFF'; els.colorPicker.value = '#1F8FFF'; updateColors();
+
+    // make updateColors available for debugging without exposing internals
+    window.updateColors = updateColors;
+  </script>
+</body>
+</html>
 
