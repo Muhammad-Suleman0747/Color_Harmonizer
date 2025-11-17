@@ -35,7 +35,7 @@
 <body>
   <main class="card" role="main">
     <h1>Functional Color Harmonizer</h1>
-    <p class="lead">Type a HEX value or pick a color. This single-page tool uses pure functions to compute complementary and triadic harmonies and updates the UI reactively.</p>
+    <p class="lead">Type a HEX value or pick a color.</p>
 
     <div class="controls" aria-live="polite">
       <div class="input-wrap">
@@ -83,8 +83,6 @@
 
     <div class="info">
       <div class="pill" id="warning" style="display:none;color:#fca5a5;background:rgba(255,165,165,0.06)">Invalid HEX — please use #RRGGBB</div>
-      <div class="pill">Pure functions: <strong>hexToHsl</strong>, <strong>calculateHarmonies</strong>, <strong>hslToCss</strong></div>
-      <div class="pill">Only <strong>updateColors</strong> touches the DOM.</div>
     </div>
   </main>
 
@@ -115,20 +113,20 @@
           case g: h = ((b - r) / d) + 2; break;
           case b: h = ((r - g) / d) + 4; break;
         }
-        h = h * 60; // convert to degrees
+        h = h * 60; 
       }
 
       return [Math.round(h === 0 ? 0 : (h % 360 + 360) % 360), Math.round(s * 100), Math.round(l * 100)];
     };
 
-    // rotateHue: pure helper. Keeps S & L the same.
+
     const rotateHue = (hsl, degrees) => {
       const [h,s,l] = hsl;
-      const newH = ((h + degrees) % 360 + 360) % 360; // normalize
+      const newH = ((h + degrees) % 360 + 360) % 360;
       return [Math.round(newH), s, l];
     };
 
-    // calculateHarmonies: pure function. Input: [H,S,L] -> returns object with complementary & triads
+
     const calculateHarmonies = baseHsl => {
       if (!Array.isArray(baseHsl) || baseHsl.length !== 3) return null;
       const complementary = rotateHue(baseHsl, 180);
@@ -137,14 +135,13 @@
       return { complementary, triadic1, triadic2 };
     };
 
-    // hslToCss: pure function. Input: [H,S,L] -> 'hsl(H, S%, L%)'
+    
     const hslToCss = hsl => {
       if (!Array.isArray(hsl) || hsl.length !== 3) return '';
       const [h,s,l] = hsl;
       return `hsl(${h}, ${s}%, ${l}%)`;
     };
 
-    // hslToHex: convert HSL back to HEX for display and copying. Pure function.
     const hslToRgb = hsl => {
       const [h, s, l] = hsl.map((v,i) => i === 0 ? v : v/100);
       const c = (1 - Math.abs(2*l - 1)) * s;
@@ -167,7 +164,6 @@
 
     const hslToHex = hsl => rgbToHex(...hslToRgb(hsl));
 
-    /* ----------------- UI (only updateColors touches the DOM) ----------------- */
     const els = {
       hexInput: document.getElementById('hexInput'),
       colorPicker: document.getElementById('colorPicker'),
@@ -190,7 +186,6 @@
       warning: document.getElementById('warning')
     };
 
-    // Guarded updateColors: reads input, computes, and updates DOM
     const updateColors = () => {
       const raw = els.hexInput.value || els.colorPicker.value || '';
       const normalized = normalizeHex(raw) || normalizeHex(els.colorPicker.value) || null;
@@ -200,11 +195,11 @@
       }
       els.warning.style.display = 'none';
 
-      // Pure conversion chain
-      const baseHsl = hexToHsl(normalized); // pure
-      const harmonies = calculateHarmonies(baseHsl); // pure
+    
+      const baseHsl = hexToHsl(normalized); 
+      const harmonies = calculateHarmonies(baseHsl); 
 
-      // Format for DOM
+
       const baseCss = hslToCss(baseHsl);
       const compCss = hslToCss(harmonies.complementary);
       const tri1Css = hslToCss(harmonies.triadic1);
@@ -215,31 +210,31 @@
       const tri1Hex = hslToHex(harmonies.triadic1);
       const tri2Hex = hslToHex(harmonies.triadic2);
 
-      // Update swatches
+
       els.baseSwatch.style.backgroundColor = baseCss; els.baseHex.textContent = baseHex; els.baseHsl.textContent = baseCss;
       els.complementarySwatch.style.backgroundColor = compCss; els.compHex.textContent = compHex; els.compHsl.textContent = compCss;
       els.triadic1Swatch.style.backgroundColor = tri1Css; els.tri1Hex.textContent = tri1Hex; els.tri1Hsl.textContent = tri1Css;
       els.triadic2Swatch.style.backgroundColor = tri2Css; els.tri2Hex.textContent = tri2Hex; els.tri2Hsl.textContent = tri2Css;
 
-      // adjust text color for readability
+  
       [els.baseSwatch, els.complementarySwatch, els.triadic1Swatch, els.triadic2Swatch].forEach(swatch => {
-        // compute luminance from background color
-        const bg = getComputedStyle(swatch).backgroundColor; // e.g. 'rgb(31,143,255)'
+
+        const bg = getComputedStyle(swatch).backgroundColor; 
         const nums = bg.match(/\d+/g) || [0,0,0];
         const [r,g,b] = nums.map(n => parseInt(n,10)/255);
         const luminance = 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
         swatch.classList.toggle('darkText', luminance > 0.6);
       });
 
-      // sync color picker & hex input
+
       els.colorPicker.value = baseHex;
       els.hexInput.value = baseHex;
     };
 
-    // helper for luminance
+
     const linearize = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 
-    /* ----------------- Utility actions ----------------- */
+
     const applyFromPicker = () => {
       const pick = els.colorPicker.value;
       els.hexInput.value = pick.toUpperCase();
@@ -283,7 +278,6 @@
       setTimeout(()=> els.copyAll.textContent = 'Copy all', 1200);
     };
 
-    /* ----------------- Event wiring ----------------- */
     els.applyBtn.addEventListener('click', applyFromInput);
     els.colorPicker.addEventListener('input', applyFromPicker);
     els.hexInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFromInput(); });
@@ -291,10 +285,8 @@
     els.copyBase.addEventListener('click', copyBaseHex);
     els.copyAll.addEventListener('click', copyAll);
 
-    // initialize
     els.hexInput.value = '#1F8FFF'; els.colorPicker.value = '#1F8FFF'; updateColors();
 
-    // make updateColors available for debugging without exposing internals
     window.updateColors = updateColors;
   </script>
 </body>
