@@ -35,7 +35,7 @@
 <body>
   <main class="card" role="main">
     <h1>Functional Color Harmonizer</h1>
-    <p class="lead">Type a HEX value or pick a color. This single-page tool uses pure functions (no classes) to compute complementary and triadic harmonies and updates the UI reactively.</p>
+    <p class="lead">Type a HEX value or pick a color. This single-page tool uses pure functions to compute complementary and triadic harmonies and updates the UI reactively.</p>
 
     <div class="controls" aria-live="polite">
       <div class="input-wrap">
@@ -86,14 +86,9 @@
       <div class="pill">Pure functions: <strong>hexToHsl</strong>, <strong>calculateHarmonies</strong>, <strong>hslToCss</strong></div>
       <div class="pill">Only <strong>updateColors</strong> touches the DOM.</div>
     </div>
-
-    <p class="footer">Download or copy the code and open as an HTML file in your browser.</p>
   </main>
 
   <script>
-    /* ----------------- Pure helper functions (no classes/prototypes) ----------------- */
-
-    // Clean hex: allow #RRGGBB or RRGGBB; return uppercase with leading '#'
     const normalizeHex = hex => {
       if (typeof hex !== 'string') return null;
       const h = hex.trim();
@@ -101,8 +96,6 @@
       if (!/^([0-9a-fA-F]{6})$/.test(withHash)) return null;
       return '#' + withHash.toUpperCase();
     };
-
-    // hexToHsl: pure function. Input: '#RRGGBB' -> Output: [H, S, L]
     const hexToHsl = hex => {
       const n = normalizeHex(hex);
       if (!n) return null;
